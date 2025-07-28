@@ -1,0 +1,266 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  phone                 String?  @unique
+  username              String?  @unique
+  passwordHash          String
+  profilePictureUrl     String?
+  status                String?
+  about                 String?
+  lastSeen              DateTime?
+  isOnline              Boolean  @default(false)
+  isVerified            Boolean  @default(false)
+  isBlocked             Boolean  @default(false)
+  privacySettings       Json     @default("{\"lastSeen\": true, \"profilePicture\": true, \"status\": true}")
+  notificationSettings  Json     @default("{\"messages\": true, \"calls\": true, \"groups\": true}")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  createdChats          Chat[]   @relation("ChatCreator")
+  chatParticipants      ChatParticipant[]
+  sentMessages          Message[]
+  messageStatuses       MessageStatus[]
+  messageReactions      MessageReaction[]
+  userRelationships     UserRelationship[] @relation("UserRelationships")
+  relatedUserRelationships UserRelationship[] @relation("RelatedUserRelationships")
+
+  @@map("users")
+}
+
+model Chat {
+  id          String   @id @default(cuid())
+  type        ChatType
+  name        String?
+  description String?
+  avatarUrl   String?
+  createdBy   String?
+  isActive    Boolean  @default(true)
+  settings    Json     @default("{\"muteNotifications\": false, \"pinChat\": false}")
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creator     User?    @relation("ChatCreator", fields: [createdBy], references: [id])
+  participants ChatParticipant[]
+  messages    Message[]
+
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id                   String           @id @default(cuid())
+  chatId               String
+  userId               String
+  role                 ParticipantRole  @default(MEMBER)
+  joinedAt             DateTime         @default(now())
+  leftAt               DateTime?
+  isActive             Boolean          @default(true)
+  permissions          Json             @default("{\"sendMessages\": true, \"editInfo\": false, \"removeMembers\": false}")
+  notificationSettings Json             @default("{\"mute\": false, \"muteUntil\": null}")
+
+  // Relations
+  chat                 Chat             @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@map("chat_participants")
+}
+
+model Message {
+  id                String      @id @default(cuid())
+  chatId            String
+  senderId          String?
+  content           String?
+  messageType       MessageType @default(TEXT)
+  mediaUrl          String?
+  replyToId         String?
+  isEdited          Boolean     @default(false)
+  isDeleted         Boolean     @default(false)
+  deletedForEveryone Boolean    @default(false)
+  editedAt          DateTime?
+  deletedAt         DateTime?
+  metadata          Json        @default("{}")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  chat              Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender            User?       @relation(fields: [senderId], references: [id])
+  replyTo           Message?    @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies           Message[]   @relation("MessageReplies")
+  messageStatuses   MessageStatus[]
+  messageReactions  MessageReaction[]
+  mediaFiles        MediaFile[]
+
+  @@map("messages")
+}
+
+model MessageStatus {
+  id          String        @id @default(cuid())
+  messageId   String
+  userId      String
+  status      MessageStatusType @default(SENT)
+  readAt      DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  message     Message       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("message_status")
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  // Relations
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
+}
+
+model UserRelationship {
+  id                String             @id @default(cuid())
+  userId            String
+  relatedUserId     String
+  relationshipType  RelationshipType
+  createdAt         DateTime           @default(now())
+
+  // Relations
+  user              User               @relation("UserRelationships", fields: [userId], references: [id], onDelete: Cascade)
+  relatedUser       User               @relation("RelatedUserRelationships", fields: [relatedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, relatedUserId, relationshipType])
+  @@map("user_relationships")
+}
+
+model MediaFile {
+  id               String           @id @default(cuid())
+  messageId        String?
+  fileName         String
+  fileType         MediaFileType
+  mimeType         String
+  fileSize         BigInt
+  originalUrl      String
+  thumbnailUrl     String?
+  compressedUrl    String?
+  previewUrl       String?
+  duration         Int?
+  width            Int?
+  height           Int?
+  metadata         Json             @default("{}")
+  processingStatus ProcessingStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  // Relations
+  message          Message?         @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  processingJobs   FileProcessingJob[]
+
+  @@map("media_files")
+}
+
+model FileProcessingJob {
+  id           String           @id @default(cuid())
+  mediaFileId  String?
+  jobType      JobType
+  status       JobStatus        @default(PENDING)
+  inputData    Json
+  outputData   Json?
+  errorMessage String?
+  retryCount   Int              @default(0)
+  maxRetries   Int              @default(3)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  // Relations
+  mediaFile    MediaFile?       @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+
+  @@map("file_processing_jobs")
+}
+
+// Enums
+enum ChatType {
+  INDIVIDUAL
+  GROUP
+}
+
+enum ParticipantRole {
+  ADMIN
+  MEMBER
+  MODERATOR
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  LOCATION
+  CONTACT
+  STICKER
+}
+
+enum MessageStatusType {
+  SENT
+  DELIVERED
+  READ
+}
+
+enum RelationshipType {
+  CONTACT
+  BLOCKED
+  FAVORITE
+}
+
+enum MediaFileType {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  STICKER
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum JobType {
+  IMAGE_PROCESSING
+  VIDEO_PROCESSING
+  AUDIO_PROCESSING
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+} 
