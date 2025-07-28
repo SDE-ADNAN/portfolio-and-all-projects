@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { authenticateToken } from '@/middleware/auth';
 import logger from '@/config/logger';
+import { addMessageToDeliveryQueue, addMessageToSearchQueue } from '@/services/messageQueue';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -267,6 +268,12 @@ router.post('/:chatId', authenticateToken, asyncHandler(async (req, res) => {
     where: { id: chatId },
     data: { updatedAt: new Date() },
   });
+  
+  // Add message to delivery and search queues
+  await Promise.all([
+    addMessageToDeliveryQueue(message.id, chatId, currentUserId),
+    addMessageToSearchQueue(message.id),
+  ]);
   
   logger.info('Message sent', { 
     messageId: message.id,
@@ -617,6 +624,99 @@ router.post('/:chatId/:messageId/read', authenticateToken, asyncHandler(async (r
     success: true,
     data: {
       message: 'Message marked as read',
+    },
+  });
+}));
+
+// GET /api/messages/search
+router.get('/search', authenticateToken, asyncHandler(async (req, res) => {
+  const currentUserId = req.user!.userId;
+  const { q: query, chatId, limit = 20, offset = 0 } = req.query;
+  
+  if (!query || typeof query !== 'string') {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'INVALID_QUERY',
+        message: 'Search query is required',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] as string || 'unknown',
+      },
+    });
+  }
+  
+  // Build where clause
+  const whereClause: any = {
+    isDeleted: false,
+    content: { contains: query, mode: 'insensitive' },
+  };
+  
+  // Filter by chat if specified
+  if (chatId && typeof chatId === 'string') {
+    whereClause.chatId = chatId;
+  }
+  
+  // Get user's chats for filtering
+  const userChats = await prisma.chatParticipant.findMany({
+    where: { 
+      userId: currentUserId,
+      isActive: true,
+    },
+    select: { chatId: true },
+  });
+  
+  whereClause.chatId = { in: userChats.map(c => c.chatId) };
+  
+  // Search messages
+  const messages = await prisma.message.findMany({
+    where: whereClause,
+    include: {
+      sender: {
+        select: {
+          id: true,
+          username: true,
+          profilePictureUrl: true,
+        },
+      },
+      chat: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+      replyTo: {
+        select: {
+          id: true,
+          content: true,
+          sender: {
+            select: {
+              username: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: Number(limit),
+    skip: Number(offset),
+  });
+  
+  // Get total count
+  const total = await prisma.message.count({
+    where: whereClause,
+  });
+  
+  res.json({
+    success: true,
+    data: {
+      messages,
+      pagination: {
+        total,
+        limit: Number(limit),
+        offset: Number(offset),
+        hasMore: total > Number(limit) + Number(offset),
+      },
     },
   });
 }));
