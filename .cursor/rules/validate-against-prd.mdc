@@ -1,0 +1,5 @@
+---
+description: Before writing any code or giving a response, Cursor should mentally “check” whether it aligns with this PRD. If unsure, it should ask for clarification first.
+globs:
+alwaysApply: true
+---

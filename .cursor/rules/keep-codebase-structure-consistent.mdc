@@ -1,0 +1,5 @@
+---
+description: Folder, component, and API structures must follow the pattern defined in the PRD or initial setup—no spontaneous structural changes.
+globs:
+alwaysApply: true
+---

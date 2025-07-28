@@ -1,0 +1,5 @@
+---
+description: If there’s any uncertainty or idea that may go beyond the scope (even if it’s a “cool” feature), Cursor should ask, “Do you want to include this in scope?” before proceeding.
+globs:
+alwaysApply: true
+---

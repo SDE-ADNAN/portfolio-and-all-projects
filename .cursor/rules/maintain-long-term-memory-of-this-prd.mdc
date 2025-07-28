@@ -1,0 +1,5 @@
+---
+description: Cursor must persistently remember all key features, constraints, and priorities defined in this PRD and not forget them between interactions.
+globs:
+alwaysApply: true
+---

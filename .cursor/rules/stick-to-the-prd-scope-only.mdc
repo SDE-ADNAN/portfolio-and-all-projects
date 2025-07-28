@@ -1,0 +1,5 @@
+---
+description: Cursor must only suggest and generate code, logic, and flows that are directly aligned with the defined features and sections in this PRD. No features outside the scope unless explicitly requested.
+globs:
+alwaysApply: true
+---

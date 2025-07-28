@@ -1,0 +1,114 @@
+import twilio from 'twilio';
+import { PrismaClient } from '@prisma/client';
+import logger from '@/config/logger';
+import crypto from 'crypto';
+
+const prisma = new PrismaClient();
+
+// Initialize Twilio client
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
+
+class SMSService {
+  private generateVerificationCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private async createVerificationRecord(
+    userId: string,
+    phone: string,
+    code: string
+  ) {
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await prisma.verificationToken.create({
+      data: {
+        identifier: userId,
+        token: code,
+        type: 'phone',
+        expiresAt,
+        metadata: { phone },
+      },
+    });
+  }
+
+  async sendVerificationSMS(userId: string, phone: string): Promise<boolean> {
+    try {
+      const code = this.generateVerificationCode();
+      
+      // Create verification record
+      await this.createVerificationRecord(userId, phone, code);
+      
+      // Send SMS
+      await twilioClient.messages.create({
+        body: `Your WhatsApp Clone verification code is: ${code}. This code will expire in 10 minutes.`,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone,
+      });
+
+      logger.info(`Verification SMS sent to ${phone}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending verification SMS:', error);
+      return false;
+    }
+  }
+
+  async verifyPhoneCode(userId: string, code: string): Promise<boolean> {
+    try {
+      const verificationRecord = await prisma.verificationToken.findFirst({
+        where: {
+          identifier: userId,
+          token: code,
+          type: 'phone',
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+      });
+
+      if (!verificationRecord) {
+        return false;
+      }
+
+      // Update user as phone verified
+      await prisma.user.update({
+        where: { id: userId },
+        data: { phoneVerified: true },
+      });
+
+      // Delete verification record
+      await prisma.verificationToken.delete({
+        where: { id: verificationRecord.id },
+      });
+
+      logger.info(`Phone verified for user ${userId}`);
+      return true;
+    } catch (error) {
+      logger.error('Error verifying phone code:', error);
+      return false;
+    }
+  }
+
+  async resendVerificationSMS(userId: string, phone: string): Promise<boolean> {
+    try {
+      // Delete any existing verification records for this user
+      await prisma.verificationToken.deleteMany({
+        where: {
+          identifier: userId,
+          type: 'phone',
+        },
+      });
+
+      // Send new verification SMS
+      return await this.sendVerificationSMS(userId, phone);
+    } catch (error) {
+      logger.error('Error resending verification SMS:', error);
+      return false;
+    }
+  }
+}
+
+export default new SMSService(); 

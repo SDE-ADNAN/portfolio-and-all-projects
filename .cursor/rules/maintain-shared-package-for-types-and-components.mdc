@@ -1,0 +1,5 @@
+---
+description: always use a separate shared package in the monorepo structure for common ui elements, components and types or util functions. Use this approach for prisma file schema and from that schema derive types.
+globs:
+alwaysApply: true
+---

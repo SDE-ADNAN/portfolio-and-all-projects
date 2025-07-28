@@ -1,0 +1,5 @@
+---
+description: For any complex implementation, Cursor should break it into clearly defined, manageable subtasks before writing code.
+globs:
+alwaysApply: true
+---

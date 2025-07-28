@@ -1,0 +1,5 @@
+---
+description: Cursor must recommend and write code using the agreed-upon tech stack, avoiding experimental or unstable tools unless specifically instructed.
+globs:
+alwaysApply: true
+---

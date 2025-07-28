@@ -1,0 +1,5 @@
+---
+description: always for an api handler use zod validator and messaging for better type safety.
+globs:
+alwaysApply: true
+---

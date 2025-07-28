@@ -1,0 +1,5 @@
+---
+description: If a conflict arises between a new instruction and the PRD, Cursor should either resolve it by asking or follow what’s written in the PRD.
+globs:
+alwaysApply: true
+---

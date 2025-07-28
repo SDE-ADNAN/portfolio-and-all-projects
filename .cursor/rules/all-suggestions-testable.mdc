@@ -1,0 +1,5 @@
+---
+description: Any UI component, backend route, or logic should be deliverable in a testable, working state.
+globs:
+alwaysApply: true
+---

@@ -1,0 +1,5 @@
+---
+description: Cursor should avoid making assumptions about the app’s behavior, UI/UX, or business logic unless it’s clearly stated in the PRD or directly asked.
+globs:
+alwaysApply: true
+---
