@@ -5,11 +5,18 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+// Initialize Twilio client only if credentials are provided
+let twilioClient: any = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  try {
+    twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+  } catch (error) {
+    logger.warn('Twilio client initialization failed:', error);
+  }
+}
 
 class SMSService {
   private generateVerificationCode(): string {
@@ -23,13 +30,22 @@ class SMSService {
   ) {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    // Get user email from database
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
     await prisma.verificationToken.create({
       data: {
-        identifier: userId,
+        email: user.email,
         token: code,
         type: 'phone',
         expiresAt,
-        metadata: { phone },
       },
     });
   }
@@ -41,14 +57,18 @@ class SMSService {
       // Create verification record
       await this.createVerificationRecord(userId, phone, code);
       
-      // Send SMS
-      await twilioClient.messages.create({
-        body: `Your WhatsApp Clone verification code is: ${code}. This code will expire in 10 minutes.`,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        to: phone,
-      });
+      // Send SMS only if Twilio client is available
+      if (twilioClient) {
+        await twilioClient.messages.create({
+          body: `Your WhatsApp Clone verification code is: ${code}. This code will expire in 10 minutes.`,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: phone,
+        });
+        logger.info(`Verification SMS sent to ${phone}`);
+      } else {
+        logger.warn('Twilio client not available, SMS not sent. Code:', code);
+      }
 
-      logger.info(`Verification SMS sent to ${phone}`);
       return true;
     } catch (error) {
       logger.error('Error sending verification SMS:', error);
@@ -58,9 +78,19 @@ class SMSService {
 
   async verifyPhoneCode(userId: string, code: string): Promise<boolean> {
     try {
+      // Get user email from database
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true }
+      });
+
+      if (!user) {
+        return false;
+      }
+
       const verificationRecord = await prisma.verificationToken.findFirst({
         where: {
-          identifier: userId,
+          email: user.email,
           token: code,
           type: 'phone',
           expiresAt: {
@@ -73,10 +103,10 @@ class SMSService {
         return false;
       }
 
-      // Update user as phone verified
+      // Update user as verified
       await prisma.user.update({
         where: { id: userId },
-        data: { phoneVerified: true },
+        data: { isVerified: true },
       });
 
       // Delete verification record
@@ -94,10 +124,20 @@ class SMSService {
 
   async resendVerificationSMS(userId: string, phone: string): Promise<boolean> {
     try {
+      // Get user email from database
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true }
+      });
+
+      if (!user) {
+        return false;
+      }
+
       // Delete any existing verification records for this user
       await prisma.verificationToken.deleteMany({
         where: {
-          identifier: userId,
+          email: user.email,
           type: 'phone',
         },
       });

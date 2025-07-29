@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { authenticateToken } from '@/middleware/auth';
 import logger from '@/config/logger';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import multer from 'multer';
 import path from 'path';
@@ -65,7 +65,7 @@ const generatePresignedUrlSchema = z.object({
 });
 
 const processMediaSchema = z.object({
-  mediaId: z.string().uuid('Invalid media ID'),
+  mediaFileId: z.string().uuid('Invalid media file ID'),
   processingType: z.enum(['compress', 'resize', 'convert']),
   options: z.record(z.any()).optional(),
 });
@@ -114,21 +114,20 @@ router.post('/upload-url', authenticateToken, asyncHandler(async (req, res) => {
   
   const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 hour
   
-  // Create media record
-  const media = await prisma.media.create({
+  // Create media file record
+  const mediaFile = await prisma.mediaFile.create({
     data: {
       fileName: validatedData.fileName,
-      fileKey,
-      fileType: validatedData.fileType,
-      fileSize: validatedData.fileSize,
-      uploadedBy: currentUserId,
-      chatId: validatedData.chatId,
-      status: 'uploading',
+      fileType: path.extname(validatedData.fileName).substring(1),
+      mimeType: validatedData.fileType,
+      fileSize: BigInt(validatedData.fileSize),
+      originalUrl: fileKey,
+      processingStatus: 'PENDING',
     },
   });
   
   logger.info('Presigned URL generated', { 
-    mediaId: media.id,
+    mediaFileId: mediaFile.id,
     fileKey,
     uploadedBy: currentUserId,
   });
@@ -136,7 +135,7 @@ router.post('/upload-url', authenticateToken, asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      mediaId: media.id,
+      mediaFileId: mediaFile.id,
       uploadUrl: presignedUrl,
       fileKey,
       expiresIn: 3600,
@@ -172,63 +171,50 @@ router.get('/:fileId', asyncHandler(async (req, res) => {
   });
 }));
 
-// POST /api/media/:mediaId/complete
-router.post('/:mediaId/complete', authenticateToken, asyncHandler(async (req, res) => {
+// POST /api/media/:mediaFileId/complete
+router.post('/:mediaFileId/complete', authenticateToken, asyncHandler(async (req, res) => {
   const currentUserId = req.user!.userId;
-  const { mediaId } = req.params;
+  const { mediaFileId } = req.params;
   
-  // Get media record
-  const media = await prisma.media.findUnique({
-    where: { id: mediaId },
+  // Get media file record
+  const mediaFile = await prisma.mediaFile.findUnique({
+    where: { id: mediaFileId },
   });
   
-  if (!media) {
+  if (!mediaFile) {
     return res.status(404).json({
       success: false,
       error: {
-        code: 'MEDIA_NOT_FOUND',
-        message: 'Media not found',
+        code: 'MEDIA_FILE_NOT_FOUND',
+        message: 'Media file not found',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] as string || 'unknown',
       },
     });
   }
   
-  // Verify ownership
-  if (media.uploadedBy !== currentUserId) {
-    return res.status(403).json({
-      success: false,
-      error: {
-        code: 'INSUFFICIENT_PERMISSIONS',
-        message: 'You can only complete your own uploads',
-        timestamp: new Date().toISOString(),
-        requestId: req.headers['x-request-id'] as string || 'unknown',
-      },
-    });
-  }
-  
-  // Update media status
-  const updatedMedia = await prisma.media.update({
-    where: { id: mediaId },
+  // Update media file status
+  const updatedMediaFile = await prisma.mediaFile.update({
+    where: { id: mediaFileId },
     data: {
-      status: 'completed',
-      completedAt: new Date(),
+      processingStatus: 'COMPLETED',
     },
   });
   
-  logger.info('Media upload completed', { 
-    mediaId,
+  logger.info('Media file upload completed', { 
+    mediaFileId,
     uploadedBy: currentUserId,
   });
   
   res.json({
     success: true,
-    data: updatedMedia,
+    data: updatedMediaFile,
   });
 }));
 
 // POST /api/media/upload
-router.post('/upload', authenticateToken, upload.single('file'), asyncHandler(async (req, res) => {
+(router as any).post('/upload', authenticateToken, upload.single('file'), async (req, res, next) => {
+  try {
   const currentUserId = req.user!.userId;
   const { chatId } = req.body;
   
@@ -284,70 +270,75 @@ router.post('/upload', authenticateToken, upload.single('file'), asyncHandler(as
   
   await s3Client.send(uploadCommand);
   
-  // Create media record
-  const media = await prisma.media.create({
+  // Create media file record
+  const mediaFile = await prisma.mediaFile.create({
     data: {
       fileName: req.file.originalname,
-      fileKey,
-      fileType: req.file.mimetype,
-      fileSize: req.file.size,
-      uploadedBy: currentUserId,
-      chatId,
-      status: 'completed',
-      completedAt: new Date(),
+      fileType: path.extname(req.file.originalname).substring(1),
+      mimeType: req.file.mimetype,
+      fileSize: BigInt(req.file.size),
+      originalUrl: fileKey,
+      processingStatus: 'COMPLETED',
     },
   });
   
   logger.info('File uploaded successfully', { 
-    mediaId: media.id,
+    mediaFileId: mediaFile.id,
     fileKey,
     uploadedBy: currentUserId,
   });
   
   res.status(201).json({
     success: true,
-    data: media,
+    data: mediaFile,
   });
-}));
+  } catch (error) {
+    next(error);
+  }
+});
 
-// GET /api/media/:mediaId
-router.get('/:mediaId', authenticateToken, asyncHandler(async (req, res) => {
+// GET /api/media/:mediaFileId
+router.get('/:mediaFileId', authenticateToken, asyncHandler(async (req, res) => {
   const currentUserId = req.user!.userId;
-  const { mediaId } = req.params;
+  const { mediaFileId } = req.params;
   
-  // Get media record
-  const media = await prisma.media.findUnique({
-    where: { id: mediaId },
+  // Get media file record
+  const mediaFile = await prisma.mediaFile.findUnique({
+    where: { id: mediaFileId },
     include: {
-      chat: {
+      message: {
         include: {
-          participants: {
-            where: { userId: currentUserId, isActive: true },
+          chat: {
+            include: {
+              participants: {
+                where: { userId: currentUserId, isActive: true },
+              },
+            },
           },
         },
       },
     },
   });
   
-  if (!media) {
+  if (!mediaFile) {
     return res.status(404).json({
       success: false,
       error: {
-        code: 'MEDIA_NOT_FOUND',
-        message: 'Media not found',
+        code: 'MEDIA_FILE_NOT_FOUND',
+        message: 'Media file not found',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] as string || 'unknown',
       },
     });
   }
   
-  // Check if user is participant in chat
-  if (media.chat.participants.length === 0) {
+  // Check if user has access to the message/chat
+  if (mediaFile.message && mediaFile.message.chat.participants.length === 0) {
     return res.status(403).json({
       success: false,
       error: {
         code: 'INSUFFICIENT_PERMISSIONS',
-        message: 'You do not have access to this media',
+        message: 'You do not have access to this media file',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] as string || 'unknown',
       },
@@ -357,7 +348,7 @@ router.get('/:mediaId', authenticateToken, asyncHandler(async (req, res) => {
   // Generate download URL
   const downloadCommand = new GetObjectCommand({
     Bucket: process.env.AWS_S3_BUCKET!,
-    Key: media.fileKey,
+    Key: mediaFile.originalUrl,
   });
   
   const downloadUrl = await getSignedUrl(s3Client, downloadCommand, { expiresIn: 3600 });
@@ -365,71 +356,81 @@ router.get('/:mediaId', authenticateToken, asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      ...media,
+      ...mediaFile,
       downloadUrl,
     },
   });
 }));
 
-// POST /api/media/:mediaId/process
-router.post('/:mediaId/process', authenticateToken, asyncHandler(async (req, res) => {
+// POST /api/media/:mediaFileId/process
+router.post('/:mediaFileId/process', authenticateToken, asyncHandler(async (req, res) => {
   const currentUserId = req.user!.userId;
-  const { mediaId } = req.params;
+  const { mediaFileId } = req.params;
   const validatedData = processMediaSchema.parse(req.body);
   
-  // Get media record
-  const media = await prisma.media.findUnique({
-    where: { id: mediaId },
+  // Get media file record
+  const mediaFile = await prisma.mediaFile.findUnique({
+    where: { id: mediaFileId },
+    include: {
+      message: {
+        include: {
+          chat: {
+            include: {
+              participants: {
+                where: { userId: currentUserId, isActive: true },
+              },
+            },
+          },
+        },
+      },
+    },
   });
   
-  if (!media) {
+  if (!mediaFile) {
     return res.status(404).json({
       success: false,
       error: {
-        code: 'MEDIA_NOT_FOUND',
-        message: 'Media not found',
+        code: 'MEDIA_FILE_NOT_FOUND',
+        message: 'Media file not found',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] as string || 'unknown',
       },
     });
   }
   
-  // Check if user is participant in chat
-  const participant = await prisma.chatParticipant.findFirst({
-    where: {
-      chatId: media.chatId,
-      userId: currentUserId,
-      isActive: true,
-    },
-  });
-  
-  if (!participant) {
+  // Check if user has access to the message/chat
+  if (mediaFile.message && mediaFile.message.chat.participants.length === 0) {
     return res.status(403).json({
       success: false,
       error: {
         code: 'INSUFFICIENT_PERMISSIONS',
-        message: 'You do not have access to this media',
+        message: 'You do not have access to this media file',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] as string || 'unknown',
       },
     });
   }
   
-  // Update media status to processing
-  await prisma.media.update({
-    where: { id: mediaId },
+  // Create processing job
+  const processingJob = await prisma.fileProcessingJob.create({
     data: {
-      status: 'processing',
-      processingType: validatedData.processingType,
-      processingOptions: validatedData.options,
+      mediaFileId,
+      jobType: validatedData.processingType,
+      status: 'PENDING',
+      inputData: JSON.stringify(validatedData.options || {}),
     },
   });
   
-  // TODO: Add to processing queue (Bull Queue)
-  // For now, just return success
+  // Update media file status to processing
+  await prisma.mediaFile.update({
+    where: { id: mediaFileId },
+    data: {
+      processingStatus: 'PROCESSING',
+    },
+  });
   
-  logger.info('Media processing requested', { 
-    mediaId,
+  logger.info('Media file processing requested', { 
+    mediaFileId,
     processingType: validatedData.processingType,
     requestedBy: currentUserId,
   });
@@ -437,8 +438,9 @@ router.post('/:mediaId/process', authenticateToken, asyncHandler(async (req, res
   res.json({
     success: true,
     data: {
-      message: 'Media processing started',
-      mediaId,
+      message: 'Media file processing started',
+      mediaFileId,
+      processingJobId: processingJob.id,
       processingType: validatedData.processingType,
     },
   });
@@ -473,33 +475,39 @@ router.get('/chat/:chatId', authenticateToken, asyncHandler(async (req, res) => 
   
   // Build where clause
   const whereClause: any = {
-    chatId,
-    status: 'completed',
+    message: {
+      chatId,
+    },
+    processingStatus: 'COMPLETED',
   };
   
   if (type) {
-    whereClause.fileType = { startsWith: type as string };
+    whereClause.mimeType = { startsWith: type as string };
   }
   
   // Get media files
-  const mediaFiles = await prisma.media.findMany({
+  const mediaFiles = await prisma.mediaFile.findMany({
     where: whereClause,
     orderBy: { createdAt: 'desc' },
     take: Number(limit),
     skip: Number(offset),
     include: {
-      uploadedByUser: {
-        select: {
-          id: true,
-          username: true,
-          profilePictureUrl: true,
+      message: {
+        include: {
+          sender: {
+            select: {
+              id: true,
+              username: true,
+              profilePictureUrl: true,
+            },
+          },
         },
       },
     },
   });
   
   // Get total count
-  const total = await prisma.media.count({
+  const total = await prisma.mediaFile.count({
     where: whereClause,
   });
   
@@ -517,45 +525,51 @@ router.get('/chat/:chatId', authenticateToken, asyncHandler(async (req, res) => 
   });
 }));
 
-// DELETE /api/media/:mediaId
-router.delete('/:mediaId', authenticateToken, asyncHandler(async (req, res) => {
+// DELETE /api/media/:mediaFileId
+router.delete('/:mediaFileId', authenticateToken, asyncHandler(async (req, res) => {
   const currentUserId = req.user!.userId;
-  const { mediaId } = req.params;
+  const { mediaFileId } = req.params;
   
-  // Get media record
-  const media = await prisma.media.findUnique({
-    where: { id: mediaId },
+  // Get media file record
+  const mediaFile = await prisma.mediaFile.findUnique({
+    where: { id: mediaFileId },
+    include: {
+      message: {
+        include: {
+          chat: {
+            include: {
+              participants: {
+                where: { userId: currentUserId },
+              },
+            },
+          },
+        },
+      },
+    },
   });
   
-  if (!media) {
+  if (!mediaFile) {
     return res.status(404).json({
       success: false,
       error: {
-        code: 'MEDIA_NOT_FOUND',
-        message: 'Media not found',
+        code: 'MEDIA_FILE_NOT_FOUND',
+        message: 'Media file not found',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] as string || 'unknown',
       },
     });
   }
   
-  // Check if user is the uploader or admin
-  const isUploader = media.uploadedBy === currentUserId;
-  const isAdmin = await prisma.chatParticipant.findFirst({
-    where: {
-      chatId: media.chatId,
-      userId: currentUserId,
-      role: 'admin',
-      isActive: true,
-    },
-  });
+  // Check if user can delete the media file
+  const isMessageSender = mediaFile.message?.senderId === currentUserId;
+  const isAdmin = mediaFile.message?.chat.participants.some(p => p.role === 'admin');
   
-  if (!isUploader && !isAdmin) {
+  if (!isMessageSender && !isAdmin) {
     return res.status(403).json({
       success: false,
       error: {
         code: 'INSUFFICIENT_PERMISSIONS',
-        message: 'You can only delete your own media or must be an admin',
+        message: 'You can only delete your own media files or must be an admin',
         timestamp: new Date().toISOString(),
         requestId: req.headers['x-request-id'] as string || 'unknown',
       },
@@ -563,31 +577,31 @@ router.delete('/:mediaId', authenticateToken, asyncHandler(async (req, res) => {
   }
   
   // Delete from S3
-  const deleteCommand = new PutObjectCommand({
+  const deleteCommand = new DeleteObjectCommand({
     Bucket: process.env.AWS_S3_BUCKET!,
-    Key: media.fileKey,
+    Key: mediaFile.originalUrl,
   });
   
   try {
     await s3Client.send(deleteCommand);
   } catch (error) {
-    logger.error('Failed to delete file from S3', { error, mediaId });
+    logger.error('Failed to delete file from S3', { error, mediaFileId });
   }
   
   // Delete from database
-  await prisma.media.delete({
-    where: { id: mediaId },
+  await prisma.mediaFile.delete({
+    where: { id: mediaFileId },
   });
   
-  logger.info('Media deleted', { 
-    mediaId,
+  logger.info('Media file deleted', { 
+    mediaFileId,
     deletedBy: currentUserId,
   });
   
   res.json({
     success: true,
     data: {
-      message: 'Media deleted successfully',
+      message: 'Media file deleted successfully',
     },
   });
 }));

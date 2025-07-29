@@ -111,8 +111,8 @@ router.put('/profile', authenticateToken, asyncHandler(async (req, res) => {
       username: validatedData.username,
       status: validatedData.status,
       about: validatedData.about,
-      privacySettings: validatedData.privacySettings,
-      notificationSettings: validatedData.notificationSettings,
+      privacySettings: validatedData.privacySettings as any,
+      notificationSettings: validatedData.notificationSettings as any,
     },
     select: {
       id: true,
@@ -151,9 +151,9 @@ router.get('/search', authenticateToken, asyncHandler(async (req, res) => {
       AND: [
         {
           OR: [
-            { username: { contains: validatedData.query, mode: 'insensitive' } },
-            { email: { contains: validatedData.query, mode: 'insensitive' } },
-            { phone: { contains: validatedData.query, mode: 'insensitive' } },
+            { username: { contains: validatedData.query} },
+            { email: { contains: validatedData.query} },
+            { phone: { contains: validatedData.query} },
           ],
         },
         { id: { not: userId } }, // Exclude current user
@@ -182,9 +182,9 @@ router.get('/search', authenticateToken, asyncHandler(async (req, res) => {
       AND: [
         {
           OR: [
-            { username: { contains: validatedData.query, mode: 'insensitive' } },
-            { email: { contains: validatedData.query, mode: 'insensitive' } },
-            { phone: { contains: validatedData.query, mode: 'insensitive' } },
+            { username: { contains: validatedData.query} },
+            { email: { contains: validatedData.query} },
+            { phone: { contains: validatedData.query} },
           ],
         },
         { id: { not: userId } },
@@ -441,7 +441,7 @@ router.post('/contacts', authenticateToken, asyncHandler(async (req, res) => {
   
   await prisma.userRelationship.createMany({
     data: contactRelationships,
-    skipDuplicates: true,
+    // skipDuplicates: true,
   });
   
   res.json({

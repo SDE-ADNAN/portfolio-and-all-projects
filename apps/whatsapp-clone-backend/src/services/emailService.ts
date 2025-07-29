@@ -26,9 +26,19 @@ class EmailService {
   ) {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
+    // Get user email from database
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
     await prisma.verificationToken.create({
       data: {
-        identifier: userId,
+        email: user.email,
         token,
         type,
         expiresAt,
@@ -138,9 +148,19 @@ class EmailService {
       
       // Create verification record with shorter expiration
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      // Get user email from database
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true }
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
       await prisma.verificationToken.create({
         data: {
-          identifier: userId,
+          email: user.email,
           token,
           type: 'password-reset',
           expiresAt,
@@ -183,10 +203,19 @@ class EmailService {
         return { success: false };
       }
 
+      // Find user by email
+      const user = await prisma.user.findUnique({
+        where: { email: verificationRecord.email }
+      });
+
+      if (!user) {
+        return { success: false };
+      }
+
       // Update user as verified
       await prisma.user.update({
-        where: { id: verificationRecord.identifier },
-        data: { emailVerified: true },
+        where: { id: user.id },
+        data: { isVerified: true },
       });
 
       // Delete verification record
@@ -194,8 +223,8 @@ class EmailService {
         where: { id: verificationRecord.id },
       });
 
-      logger.info(`Email verified for user ${verificationRecord.identifier}`);
-      return { success: true, userId: verificationRecord.identifier };
+      logger.info(`Email verified for user ${user.id}`);
+      return { success: true, userId: user.id };
     } catch (error) {
       logger.error('Error verifying email token:', error);
       return { success: false };
@@ -218,7 +247,16 @@ class EmailService {
         return { success: false };
       }
 
-      return { success: true, userId: verificationRecord.identifier };
+      // Find user by email
+      const user = await prisma.user.findUnique({
+        where: { email: verificationRecord.email }
+      });
+
+      if (!user) {
+        return { success: false };
+      }
+
+      return { success: true, userId: user.id };
     } catch (error) {
       logger.error('Error verifying password reset token:', error);
       return { success: false };

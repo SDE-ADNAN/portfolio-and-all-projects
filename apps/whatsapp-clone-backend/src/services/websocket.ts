@@ -9,14 +9,6 @@ const prisma = new PrismaClient();
 interface AuthenticatedSocket extends Socket {
   userId?: string;
   userEmail?: string;
-  handshake: any;
-  id: string;
-  disconnect: () => void;
-  join: (room: string) => void;
-  leave: (room: string) => void;
-  emit: (event: string, data: any) => void;
-  to: (room: string) => any;
-  on: (event: string, callback: (data: any) => void) => void;
 }
 
 // WebSocket authentication middleware

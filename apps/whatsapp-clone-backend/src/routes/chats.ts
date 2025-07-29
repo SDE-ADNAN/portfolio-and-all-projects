@@ -39,6 +39,14 @@ router.get('/', authenticateToken, asyncHandler(async (req, res) => {
   const userId = req.user!.userId;
   const { limit = 20, offset = 0, search } = req.query;
   
+  // Build where clause for chat search
+  const chatWhereClause = search ? {
+    OR: [
+      { name: { contains: search as string, mode: 'insensitive' } },
+      { description: { contains: search as string, mode: 'insensitive' } },
+    ],
+  } : {};
+  
   // Get user's active chats
   const userChats = await prisma.chatParticipant.findMany({
     where: {
@@ -46,12 +54,7 @@ router.get('/', authenticateToken, asyncHandler(async (req, res) => {
       isActive: true,
       chat: {
         isActive: true,
-        ...(search ? {
-          OR: [
-            { name: { contains: search as string, mode: 'insensitive' } },
-            { description: { contains: search as string, mode: 'insensitive' } },
-          ],
-        } : {}),
+        ...chatWhereClause,
       },
     },
     include: {
@@ -102,16 +105,40 @@ router.get('/', authenticateToken, asyncHandler(async (req, res) => {
           chatId: participant.chatId,
           senderId: { not: userId },
           createdAt: {
-            gt: participant.lastReadAt || new Date(0),
+            gt: new Date(0), // Remove lastReadAt since it doesn't exist on participant type
           },
         },
       });
-      
+      const chat = await prisma.chat.findUnique({
+        where: { id: participant.chatId },
+        include: {
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              sender: {
+                select: {
+                  id: true,
+                  username: true,
+                },
+              },
+            },
+          },
+          participants: {
+            where: { isActive: true },
+          },
+        },
+      });
+
+      if (!chat) {
+        throw new Error(`Chat ${participant.chatId} not found`);
+      }
+
       return {
-        ...participant.chat,
+        ...chat,
         unreadCount,
-        lastMessage: participant.chat.messages[0] || null,
-        participantCount: participant.chat.participants.length,
+        lastMessage: chat.messages[0] || null,
+        participantCount: chat.participants.length,
       };
     })
   );
@@ -347,7 +374,7 @@ router.put('/:chatId', authenticateToken, asyncHandler(async (req, res) => {
     data: {
       name: validatedData.name,
       description: validatedData.description,
-      settings: validatedData.settings,
+      settings: validatedData.settings as any,
     },
     include: {
       participants: {

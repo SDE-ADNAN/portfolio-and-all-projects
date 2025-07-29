@@ -47,7 +47,7 @@ export const errorHandler = (err: AppError, req: Request, res: Response, next: N
     message = 'Too many requests';
   } else if (err.statusCode) {
     statusCode = err.statusCode;
-    errorCode = err.code || ErrorCodes.INTERNAL_SERVER_ERROR;
+    errorCode = (err.code as ErrorCodes) || ErrorCodes.INTERNAL_SERVER_ERROR;
     message = err.message;
   }
   

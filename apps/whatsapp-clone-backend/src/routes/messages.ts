@@ -102,7 +102,7 @@ router.get('/:chatId', authenticateToken, asyncHandler(async (req, res) => {
           },
         },
       },
-      reactions: {
+      messageReactions: {
         include: {
           user: {
             select: {
@@ -112,7 +112,7 @@ router.get('/:chatId', authenticateToken, asyncHandler(async (req, res) => {
           },
         },
       },
-      messageStatus: {
+      messageStatuses: {
         where: { userId: currentUserId },
       },
     },
@@ -126,7 +126,7 @@ router.get('/:chatId', authenticateToken, asyncHandler(async (req, res) => {
       chatId,
       isDeleted: false,
       ...(validatedData.search ? {
-        content: { contains: validatedData.search, mode: 'insensitive' },
+        content: { contains: validatedData.search},
       } : {}),
     },
   });
@@ -134,9 +134,10 @@ router.get('/:chatId', authenticateToken, asyncHandler(async (req, res) => {
   // Mark messages as read
   const unreadMessages = messages.filter(msg => 
     msg.senderId !== currentUserId && 
-    !msg.messageStatus[0]?.readAt
+    msg.messageStatuses?.[0] && 
+    !msg.messageStatuses[0].readAt
   );
-  
+
   if (unreadMessages.length > 0) {
     await prisma.messageStatus.updateMany({
       where: {
@@ -422,8 +423,8 @@ router.delete('/:chatId/:messageId', authenticateToken, asyncHandler(async (req,
         userId: currentUserId,
       },
       data: {
-        isDeleted: true,
-        deletedAt: new Date(),
+        status: 'DELETED',
+        updatedAt: new Date()
       },
     });
   }

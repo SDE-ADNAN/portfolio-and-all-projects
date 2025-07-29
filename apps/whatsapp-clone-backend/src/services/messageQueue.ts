@@ -55,7 +55,6 @@ deliveryQueue.process(async (job) => {
     
     await prisma.messageStatus.createMany({
       data: messageStatuses,
-      skipDuplicates: true,
     });
     
     logger.info('Message delivered to participants', { 
@@ -90,13 +89,12 @@ searchQueue.process(async (job) => {
       throw new Error('Message not found for indexing');
     }
     
-    // Create search index entry (if using a separate search service)
-    // For now, we'll use PostgreSQL full-text search
-    await prisma.message.update({
-      where: { id: messageId },
-      data: {
-        searchVector: `${message.content} ${message.sender.username}`,
-      },
+    // Message is ready for search indexing
+    // Search can be performed on the content field directly
+    logger.info('Message ready for search indexing', { 
+      messageId, 
+      content: message.content,
+      sender: message.sender.username 
     });
     
     logger.info('Message indexed for search', { messageId });

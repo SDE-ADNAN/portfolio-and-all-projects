@@ -17,5 +17,8 @@
   "devDependencies": {
     "turbo": "^2.5.5"
   },
-  "packageManager": "yarn@1.22.19"
+  "packageManager": "yarn@1.22.19",
+  "dependencies": {
+    "@aws-sdk/s3-request-presigner": "3.855.0"
+  }
 }

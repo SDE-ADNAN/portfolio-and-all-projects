@@ -6,8 +6,10 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
-import { Server } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
+
+// Temporary require syntax for problematic imports
+const { Server } = require('socket.io');
+const { createAdapter } = require('@socket.io/redis-adapter');
 
 // Load environment variables
 dotenv.config();
@@ -44,19 +46,19 @@ const rateLimitConfig = {
 
 const authRateLimit = {
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS || '5'), // 5 attempts per 15 minutes
+  max: parseInt(process.env['AUTH_RATE_LIMIT_MAX_REQUESTS'] || '5'), // 5 attempts per 15 minutes
   message: 'Too many authentication attempts',
 };
 
 const messageRateLimit = {
   windowMs: 60 * 1000, // 1 minute
-  max: parseInt(process.env.MESSAGE_RATE_LIMIT_MAX_REQUESTS || '30'), // 30 messages per minute
+  max: parseInt(process.env['MESSAGE_RATE_LIMIT_MAX_REQUESTS'] || '30'), // 30 messages per minute
   message: 'Message rate limit exceeded',
 };
 
 // Middleware
 app.use(helmet());
-app.use(compression());
+app.use(compression() as any);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -115,29 +117,49 @@ const io = new Server(server, {
     origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
     credentials: true,
   },
-  pingTimeout: parseInt(process.env.WS_HEARTBEAT_TIMEOUT || '60000'),
-  pingInterval: parseInt(process.env.WS_HEARTBEAT_INTERVAL || '25000'),
+  pingTimeout: parseInt(process.env['WS_HEARTBEAT_TIMEOUT'] || '60000'),
+  pingInterval: parseInt(process.env['WS_HEARTBEAT_INTERVAL'] || '25000'),
 });
 
 // Redis adapter for Socket.IO
-const pubClient = redisClient.duplicate();
-const subClient = redisClient.duplicate();
-
-io.adapter(createAdapter(pubClient, subClient));
+const setupRedisAdapter = async () => {
+  try {
+    const pubClient = redisClient.duplicate();
+    const subClient = redisClient.duplicate();
+    
+    await Promise.all([
+      pubClient.connect(),
+      subClient.connect()
+    ]);
+    
+    io.adapter(createAdapter(pubClient, subClient) as any);
+    logger.info('Redis adapter connected successfully');
+  } catch (error) {
+    logger.error('Failed to setup Redis adapter:', error);
+  }
+};
 
 // Setup WebSocket handlers
 setupWebSocket(io);
 
+// Setup Redis adapter
+setupRedisAdapter();
+
 // Graceful shutdown
-const gracefulShutdown = (signal: string) => {
+const gracefulShutdown = async (signal: string) => {
   logger.info(`Received ${signal}. Starting graceful shutdown...`);
   
-  server.close(() => {
+  server.close(async () => {
     logger.info('HTTP server closed');
-    redisClient.quit(() => {
+    
+    try {
+      await redisClient.quit();
       logger.info('Redis client closed');
       process.exit(0);
-    });
+    } catch (error) {
+      logger.error('Error closing Redis client:', error);
+      process.exit(1);
+    }
   });
 };
 
@@ -151,4 +173,4 @@ server.listen(port, () => {
   logger.info(`🔗 Health check: http://localhost:${port}/health`);
 });
 
-export default app; 
+export default app;

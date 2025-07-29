@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -23,8 +23,8 @@ model User {
   isOnline              Boolean  @default(false)
   isVerified            Boolean  @default(false)
   isBlocked             Boolean  @default(false)
-  privacySettings       Json     @default("{\"lastSeen\": true, \"profilePicture\": true, \"status\": true}")
-  notificationSettings  Json     @default("{\"messages\": true, \"calls\": true, \"groups\": true}")
+  privacySettings       String   @default("{\"lastSeen\": true, \"profilePicture\": true, \"status\": true}")
+  notificationSettings  String   @default("{\"messages\": true, \"calls\": true, \"groups\": true}")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -42,14 +42,14 @@ model User {
 
 model Chat {
   id          String   @id @default(cuid())
-  type        ChatType
+  type        String
   name        String?
   description String?
   avatarUrl   String?
   createdBy   String?
   isActive    Boolean  @default(true)
-  settings    Json     @default("{\"muteNotifications\": false, \"pinChat\": false}")
-  metadata    Json     @default("{}")
+  settings    String   @default("{\"muteNotifications\": false, \"pinChat\": false}")
+  metadata    String   @default("{}")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -65,12 +65,12 @@ model ChatParticipant {
   id                   String           @id @default(cuid())
   chatId               String
   userId               String
-  role                 ParticipantRole  @default(MEMBER)
+  role                 String           @default("MEMBER")
   joinedAt             DateTime         @default(now())
   leftAt               DateTime?
   isActive             Boolean          @default(true)
-  permissions          Json             @default("{\"sendMessages\": true, \"editInfo\": false, \"removeMembers\": false}")
-  notificationSettings Json             @default("{\"mute\": false, \"muteUntil\": null}")
+  permissions          String           @default("{\"sendMessages\": true, \"editInfo\": false, \"removeMembers\": false}")
+  notificationSettings String           @default("{\"mute\": false, \"muteUntil\": null}")
 
   // Relations
   chat                 Chat             @relation(fields: [chatId], references: [id], onDelete: Cascade)
@@ -85,7 +85,7 @@ model Message {
   chatId            String
   senderId          String?
   content           String?
-  messageType       MessageType @default(TEXT)
+  messageType       String      @default("TEXT")
   mediaUrl          String?
   replyToId         String?
   isEdited          Boolean     @default(false)
@@ -93,7 +93,7 @@ model Message {
   deletedForEveryone Boolean    @default(false)
   editedAt          DateTime?
   deletedAt         DateTime?
-  metadata          Json        @default("{}")
+  metadata          String      @default("{}")
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
@@ -113,7 +113,7 @@ model MessageStatus {
   id          String        @id @default(cuid())
   messageId   String
   userId      String
-  status      MessageStatusType @default(SENT)
+  status      String            @default("SENT")
   readAt      DateTime?
   deliveredAt DateTime?
   createdAt   DateTime      @default(now())
@@ -146,7 +146,7 @@ model UserRelationship {
   id                String             @id @default(cuid())
   userId            String
   relatedUserId     String
-  relationshipType  RelationshipType
+  relationshipType  String
   createdAt         DateTime           @default(now())
 
   // Relations
@@ -161,7 +161,7 @@ model MediaFile {
   id               String           @id @default(cuid())
   messageId        String?
   fileName         String
-  fileType         MediaFileType
+  fileType         String
   mimeType         String
   fileSize         BigInt
   originalUrl      String
@@ -171,8 +171,8 @@ model MediaFile {
   duration         Int?
   width            Int?
   height           Int?
-  metadata         Json             @default("{}")
-  processingStatus ProcessingStatus @default(PENDING)
+  metadata         String           @default("{}")
+  processingStatus String           @default("PENDING")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -186,10 +186,10 @@ model MediaFile {
 model FileProcessingJob {
   id           String           @id @default(cuid())
   mediaFileId  String?
-  jobType      JobType
-  status       JobStatus        @default(PENDING)
-  inputData    Json
-  outputData   Json?
+  jobType      String
+  status       String           @default("PENDING")
+  inputData    String
+  outputData   String?
   errorMessage String?
   retryCount   Int              @default(0)
   maxRetries   Int              @default(3)
@@ -202,65 +202,14 @@ model FileProcessingJob {
   @@map("file_processing_jobs")
 }
 
-// Enums
-enum ChatType {
-  INDIVIDUAL
-  GROUP
-}
+model VerificationToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  type      String   // "EMAIL_VERIFICATION" or "PASSWORD_RESET"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
-enum ParticipantRole {
-  ADMIN
-  MEMBER
-  MODERATOR
+  @@map("verification_tokens")
 }
-
-enum MessageType {
-  TEXT
-  IMAGE
-  VIDEO
-  AUDIO
-  DOCUMENT
-  LOCATION
-  CONTACT
-  STICKER
-}
-
-enum MessageStatusType {
-  SENT
-  DELIVERED
-  READ
-}
-
-enum RelationshipType {
-  CONTACT
-  BLOCKED
-  FAVORITE
-}
-
-enum MediaFileType {
-  IMAGE
-  VIDEO
-  AUDIO
-  DOCUMENT
-  STICKER
-}
-
-enum ProcessingStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-enum JobType {
-  IMAGE_PROCESSING
-  VIDEO_PROCESSING
-  AUDIO_PROCESSING
-}
-
-enum JobStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-} 
+ 
