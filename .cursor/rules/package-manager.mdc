@@ -1,0 +1,5 @@
+---
+description: only use yarn package manager as we are working in a turborepo/monorepo project and have our individual apps under apps/ file using yarn workspaces.
+globs:
+alwaysApply: true
+---

@@ -2,15 +2,23 @@ import type { Config } from 'tailwindcss'
 
 const config: Config = {
   content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/features/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
+    '../../packages/ui/**/*.{js,ts,jsx,tsx}',
   ],
   darkMode: 'class',
   theme: {
     extend: {
+      borderRadius: {
+        DEFAULT: 'var(--radius)',
+        'chat-bubble': '0.75rem',
+        'chat-bubble-sent': '0.75rem 0.75rem 0.25rem 0.75rem',
+        'chat-bubble-received': '0.75rem 0.75rem 0.75rem 0.25rem',
+      },
       colors: {
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        border: 'hsl(var(--border))',
+        ring: 'hsl(var(--ring))',
         // WhatsApp-inspired color palette
         primary: {
           50: '#f0fdf4',
@@ -223,11 +231,6 @@ const config: Config = {
         'sidebar-dark': '2px 0 8px rgba(0, 0, 0, 0.3)',
         'modal': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         'modal-dark': '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-      },
-      borderRadius: {
-        'chat-bubble': '0.75rem',
-        'chat-bubble-sent': '0.75rem 0.75rem 0.25rem 0.75rem',
-        'chat-bubble-received': '0.75rem 0.75rem 0.75rem 0.25rem',
       },
       zIndex: {
         'chat-input': '10',

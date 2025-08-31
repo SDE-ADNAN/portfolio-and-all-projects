@@ -1,419 +1,175 @@
-@import "tailwindcss/preflight";
-@import "tailwindcss/utilities";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme Variables */
+:root {
+  /* Light theme */
+  --background: 0 0% 100%;
+  --foreground: 215 28% 17%;
+  --card-bg: 0 0% 100%;
+  --card-border: 220 14% 95%;
+  --text-muted: 220 9% 46%;
+  --border: 220 14% 85%;
+  --ring: 142 71% 45%;
+  --radius: 1rem;
+}
+
+/* Dark theme */
+[data-theme="dark"], :root.dark {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card-bg: 0 0% 4%;
+  --card-border: 215 19% 35%;
+  --text-muted: 215 20% 65%;
+  --border: 215 19% 35%;
+  --ring: 142 71% 45%;
+}
+
+/* Base Styles */
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Card Styles */
+.card {
+  background-color: hsl(var(--card-bg));
+  border-color: hsl(var(--card-border));
+  transition: transform 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+}
+
+/* Image Styles */
+.card-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.card-image:hover img {
+  transform: scale(1.1);
+}
+
+/* Container and Grid */
+.container {
+  max-width: 1200px;
+}
+
+.grid {
+  gap: 2rem;
+}
+
+/* Text and Border Styles */
+.text-muted {
+  color: hsl(var(--text-muted));
+}
+
+.border {
+  border-color: hsl(var(--border));
+}
+
+/* Component Layer */
+@layer components {
+  .skeleton {
+    background-color: var(--border);
+    border-radius: 0.5rem;
+  }
+}
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 18 100% 50%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 18 100% 50%;
-    --radius: 0.5rem;
-    
-    /* WhatsApp Colors */
-    --whatsapp-green: 142 70% 45%;
-    --whatsapp-light-green: 142 70% 55%;
-    --whatsapp-dark-green: 142 70% 35%;
-    --whatsapp-gray: 0 0% 96%;
-    --whatsapp-light-gray: 0 0% 98%;
-    --whatsapp-dark-gray: 0 0% 20%;
-    --whatsapp-blue: 210 100% 50%;
-    --whatsapp-light-blue: 210 100% 60%;
-    --whatsapp-yellow: 45 100% 50%;
-    --whatsapp-red: 0 100% 50%;
-    --whatsapp-purple: 270 100% 50%;
-    --whatsapp-pink: 330 100% 50%;
-    --whatsapp-orange: 25 100% 50%;
+    --color-1: 0 100% 63%;
+    --color-2: 270 100% 63%;
+    --color-3: 210 100% 63%;
+    --color-4: 195 100% 63%;
+    --color-5: 90 100% 63%;
   }
-
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 18 100% 50%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 18 100% 50%;
+    --color-1: 0 100% 63%;
+    --color-2: 270 100% 63%;
+    --color-3: 210 100% 63%;
+    --color-4: 195 100% 63%;
+    --color-5: 90 100% 63%;
   }
 }
-
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
   }
-  
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
-  
-  html {
-    scroll-behavior: smooth;
-  }
-  
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: hsl(var(--muted));
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground));
-    border-radius: 3px;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--foreground));
   }
 }
 
-@layer components {
-  /* WhatsApp-specific components */
-  .whatsapp-container {
-    @apply flex h-full bg-[#f0f2f5];
+@keyframes aurora-move {
+  0% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  50% { transform: translateY(10px) translateX(10px) rotate(15deg); }
+  100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+}
+
+.aurora-bg {
+  @apply absolute h-[30vw] w-[30vw] blur-[1rem] mix-blend-overlay animate-[aurora-move_8s_infinite_alternate];
+}
+
+@keyframes dotGlow {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
   }
-  
-  .whatsapp-sidebar {
-    @apply w-80 bg-white border-r border-gray-200 flex flex-col;
+  50% {
+    opacity: 1;
+    transform: scale(1.5);
   }
-  
-  .whatsapp-chat {
-    @apply flex-1 bg-[#efeae2] flex flex-col;
-  }
-  
-  .whatsapp-header {
-    @apply bg-[#008069] text-white px-4 py-3 flex items-center justify-between;
-  }
-  
-  .whatsapp-message-bubble {
-    @apply max-w-xs lg:max-w-md px-3 py-2 rounded-lg mb-2;
-  }
-  
-  .whatsapp-message-sent {
-    @apply bg-[#dcf8c6] ml-auto;
-  }
-  
-  .whatsapp-message-received {
-    @apply bg-white;
-  }
-  
-  .whatsapp-input-container {
-    @apply bg-white border-t border-gray-200 px-4 py-3;
-  }
-  
-  .whatsapp-input {
-    @apply flex items-center bg-gray-100 rounded-lg px-3 py-2;
-  }
-  
-  .whatsapp-button {
-    @apply bg-[#008069] hover:bg-[#006d5b] text-white px-4 py-2 rounded-lg transition-colors;
-  }
-  
-  .whatsapp-button-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors;
-  }
-  
-  .whatsapp-avatar {
-    @apply w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-medium;
-  }
-  
-  .whatsapp-status-indicator {
-    @apply w-2 h-2 rounded-full;
-  }
-  
-  .whatsapp-status-online {
-    @apply bg-green-500;
-  }
-  
-  .whatsapp-status-offline {
-    @apply bg-gray-400;
-  }
-  
-  .whatsapp-typing-indicator {
-    @apply flex items-center space-x-1 px-3 py-1;
-  }
-  
-  .whatsapp-typing-dot {
-    @apply w-2 h-2 bg-gray-400 rounded-full animate-pulse;
-  }
-  
-  .whatsapp-typing-dot:nth-child(1) {
-    animation-delay: 0ms;
-  }
-  
-  .whatsapp-typing-dot:nth-child(2) {
-    animation-delay: 150ms;
-  }
-  
-  .whatsapp-typing-dot:nth-child(3) {
-    animation-delay: 300ms;
-  }
-  
-  /* Message status indicators */
-  .whatsapp-message-status {
-    @apply flex items-center space-x-1 text-xs text-gray-500;
-  }
-  
-  .whatsapp-message-status-sent {
-    @apply text-gray-400;
-  }
-  
-  .whatsapp-message-status-delivered {
-    @apply text-blue-500;
-  }
-  
-  .whatsapp-message-status-read {
-    @apply text-blue-600;
-  }
-  
-  /* Chat list item */
-  .whatsapp-chat-item {
-    @apply flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors;
-  }
-  
-  .whatsapp-chat-item.active {
-    @apply bg-gray-100;
-  }
-  
-  .whatsapp-chat-preview {
-    @apply flex-1 min-w-0;
-  }
-  
-  .whatsapp-chat-name {
-    @apply font-medium text-gray-900 truncate;
-  }
-  
-  .whatsapp-chat-message {
-    @apply text-sm text-gray-600 truncate;
-  }
-  
-  .whatsapp-chat-time {
-    @apply text-xs text-gray-500;
-  }
-  
-  .whatsapp-chat-unread {
-    @apply bg-[#008069] text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center;
-  }
-  
-  /* Emoji picker */
-  .whatsapp-emoji-picker {
-    @apply absolute bottom-full right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-2;
-  }
-  
-  .whatsapp-emoji-grid {
-    @apply grid grid-cols-8 gap-1;
-  }
-  
-  .whatsapp-emoji-item {
-    @apply w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer;
-  }
-  
-  /* File upload */
-  .whatsapp-file-upload {
-    @apply relative;
-  }
-  
-  .whatsapp-file-input {
-    @apply absolute inset-0 w-full h-full opacity-0 cursor-pointer;
-  }
-  
-  .whatsapp-file-button {
-    @apply p-2 text-gray-500 hover:text-gray-700 transition-colors;
-  }
-  
-  /* Voice message */
-  .whatsapp-voice-message {
-    @apply flex items-center space-x-2 px-3 py-2 bg-red-500 text-white rounded-lg;
-  }
-  
-  .whatsapp-voice-waveform {
-    @apply flex items-center space-x-1;
-  }
-  
-  .whatsapp-voice-bar {
-    @apply w-1 bg-white rounded-full;
-  }
-  
-  /* Media message */
-  .whatsapp-media-message {
-    @apply max-w-xs lg:max-w-md;
-  }
-  
-  .whatsapp-media-image {
-    @apply rounded-lg overflow-hidden;
-  }
-  
-  .whatsapp-media-video {
-    @apply rounded-lg overflow-hidden;
-  }
-  
-  .whatsapp-media-document {
-    @apply flex items-center space-x-3 p-3 bg-gray-100 rounded-lg;
-  }
-  
-  /* Reply message */
-  .whatsapp-reply-message {
-    @apply border-l-4 border-gray-300 pl-3 mb-2;
-  }
-  
-  .whatsapp-reply-content {
-    @apply text-sm text-gray-600;
-  }
-  
-  .whatsapp-reply-sender {
-    @apply font-medium text-gray-900;
-  }
-  
-  /* Group chat */
-  .whatsapp-group-avatar {
-    @apply relative;
-  }
-  
-  .whatsapp-group-avatar-overlay {
-    @apply absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white text-xs font-medium;
-  }
-  
-  /* Search */
-  .whatsapp-search {
-    @apply relative;
-  }
-  
-  .whatsapp-search-input {
-    @apply w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#008069] focus:border-transparent;
-  }
-  
-  .whatsapp-search-icon {
-    @apply absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400;
-  }
-  
-  /* Responsive design */
-  @media (max-width: 768px) {
-    .whatsapp-sidebar {
-      @apply w-full;
-    }
-    
-    .whatsapp-chat {
-      @apply hidden;
-    }
-    
-    .whatsapp-chat.active {
-      @apply flex;
-    }
-  }
-  
-  /* Dark mode support */
-  .dark .whatsapp-container {
-    @apply bg-gray-900;
-  }
-  
-  .dark .whatsapp-sidebar {
-    @apply bg-gray-800 border-gray-700;
-  }
-  
-  .dark .whatsapp-chat {
-    @apply bg-gray-900;
-  }
-  
-  .dark .whatsapp-message-received {
-    @apply bg-gray-700 text-white;
-  }
-  
-  .dark .whatsapp-input-container {
-    @apply bg-gray-800 border-gray-700;
-  }
-  
-  .dark .whatsapp-input {
-    @apply bg-gray-700 text-white;
-  }
-  
-  .dark .whatsapp-chat-item:hover {
-    @apply bg-gray-700;
-  }
-  
-  .dark .whatsapp-chat-item.active {
-    @apply bg-gray-600;
-  }
-  
-  .dark .whatsapp-chat-name {
-    @apply text-white;
-  }
-  
-  .dark .whatsapp-chat-message {
-    @apply text-gray-300;
-  }
-  
-  .dark .whatsapp-chat-time {
-    @apply text-gray-400;
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
   }
 }
 
-@layer utilities {
-  /* Custom utilities */
-  .text-balance {
-    text-wrap: balance;
+/* Vendor-prefixed versions for better cross-browser support */
+@-webkit-keyframes dotGlow {
+  0% {
+    opacity: 0.4;
+    -webkit-transform: scale(1);
   }
-  
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  50% {
+    opacity: 1;
+    -webkit-transform: scale(1.5);
   }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
+  100% {
+    opacity: 0.4;
+    -webkit-transform: scale(1);
   }
-  
-  .animate-pulse-slow {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-  
-  .animate-bounce-slow {
-    animation: bounce 2s infinite;
-  }
-  
-  /* WhatsApp-specific utilities */
-  .whatsapp-gradient {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  }
-  
-  .whatsapp-shadow {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-  
-  .whatsapp-shadow-lg {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  }
-  
-  .whatsapp-blur {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+}
+
+.dot-animate {
+  animation-name: dotGlow;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+
+  /* Vendor prefixes for older browsers */
+  -webkit-animation-name: dotGlow;
+  -webkit-animation-timing-function: ease-in-out;
+  -webkit-animation-iteration-count: infinite;
+  -webkit-animation-direction: alternate;
+}
+
+/* Ensure accessibility: Disable animations if user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .dot-animate {
+    animation: none;
   }
 }
